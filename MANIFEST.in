@@ -1,6 +1,8 @@
 include LICENSE
 include README.rst
-include test/test.avi
+
+include tests/*.py
+include tests/test.avi
 
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
