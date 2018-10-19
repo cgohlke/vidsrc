@@ -1,4 +1,7 @@
+# -*- coding: utf-8 -*-
 # vidsrc/setup.py
+
+"""Vidsrc package setuptools script."""
 
 import sys
 import re
@@ -27,8 +30,8 @@ if 'sdist' in sys.argv:
     with open('README.rst', 'w') as fh:
         fh.write(readme)
 
-DIRECTX_DIR = "X:/DirectX/include"
-STRMBASE_DIR = "X:/DirectX/Samples/C++/DirectShow/BaseClasses"
+DIRECTX_DIR = 'X:/DirectX/include'
+STRMBASE_DIR = 'X:/DirectX/Samples/C++/DirectShow/BaseClasses'
 
 setup(
     name='vidsrc',
@@ -44,7 +47,7 @@ setup(
         include_dirs=[numpy.get_include(), DIRECTX_DIR, STRMBASE_DIR],
         library_dirs=[STRMBASE_DIR + '/libraries'],
         libraries=['STRMBASE', 'Ole32', 'OleAut32', 'strmiids'],)],
-    install_requires=['numpy (>=1.14)'],
+    install_requires=['numpy>=1.14'],
     license='BSD',
     zip_safe=False,
     platforms=['Windows'],
