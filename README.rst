@@ -1,7 +1,8 @@
 Video Frameserver for Numpy
 ===========================
 
-Read frames from video file as numpy array via DirectShow IMediaDet interface.
+Vidsrc is a Python library to read frames from video files as numpy arrays
+via the DirectShow IMediaDet interface.
 
 :Author:
   `Christoph Gohlke <https://www.lfd.uci.edu/~gohlke/>`_
@@ -9,11 +10,11 @@ Read frames from video file as numpy array via DirectShow IMediaDet interface.
 :Organization:
   Laboratory for Fluorescence Dynamics. University of California, Irvine
 
-:Version: 2018.8.15
+:Version: 2018.10.18
 
 Requirements
 ------------
-* `CPython 2.7 or 3.5+ <http://www.python.org>`_
+* `CPython 2.7 or 3.5+ <https://www.python.org>`_
 * `Numpy 1.14 <https://www.numpy.org>`_
 * Microsoft Visual Studio  (build)
 * DirectX 9.0c SDK  (build)
@@ -25,7 +26,6 @@ Notes
 The DirectShow IMediaDet interface is deprecated and may be removed from
 future releases of Windows
 (https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).
-
 
 Example
 -------
