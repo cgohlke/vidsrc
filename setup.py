@@ -29,6 +29,9 @@ if 'sdist' in sys.argv:
         fh.write(license)
     with open('README.rst', 'w') as fh:
         fh.write(readme)
+    numpy_required = '1.11.3'
+else:
+    numpy_required = numpy.__version__
 
 DIRECTX_DIR = 'X:/DirectX/include'
 STRMBASE_DIR = 'X:/DirectX/Samples/C++/DirectShow/BaseClasses'
@@ -47,7 +50,7 @@ setup(
         include_dirs=[numpy.get_include(), DIRECTX_DIR, STRMBASE_DIR],
         library_dirs=[STRMBASE_DIR + '/libraries'],
         libraries=['STRMBASE', 'Ole32', 'OleAut32', 'strmiids'],)],
-    install_requires=['numpy>=1.14'],
+    install_requires=['numpy>=%s' % numpy_required],
     license='BSD',
     zip_safe=False,
     platforms=['Windows'],
@@ -62,7 +65,6 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
