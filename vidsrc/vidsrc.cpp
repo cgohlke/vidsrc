@@ -1,8 +1,8 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2018, Christoph Gohlke
-Copyright (c) 2006-2018, The Regents of the University of California
+Copyright (c) 2006-2019, Christoph Gohlke
+Copyright (c) 2006-2019, The Regents of the University of California
 Produced at the Laboratory for Fluorescence Dynamics
 All rights reserved.
 
@@ -43,7 +43,7 @@ via the DirectShow IMediaDet interface.
 :Organization:
   Laboratory for Fluorescence Dynamics. University of California, Irvine
 
-:Version: 2018.10.18
+:Version: 2019.1.1
 
 Requirements
 ------------
@@ -53,6 +53,11 @@ Requirements
 * DirectX 9.0c SDK  (build)
 * DirectShow BaseClasses include files  (build)
 * DirectShow STRMBASE.lib  (build)
+
+Revisions
+---------
+2019.1.1
+    Update copyright year.
 
 Notes
 -----
@@ -79,7 +84,7 @@ Example
 
 */
 
-#define _VERSION_ "2018.10.18"
+#define _VERSION_ "2019.1.1"
 
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_DCOM
