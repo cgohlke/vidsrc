@@ -10,7 +10,7 @@ via the DirectShow IMediaDet interface.
 :Organization:
   Laboratory for Fluorescence Dynamics. University of California, Irvine
 
-:Version: 2018.10.18
+:Version: 2019.1.1
 
 Requirements
 ------------
@@ -20,6 +20,11 @@ Requirements
 * DirectX 9.0c SDK  (build)
 * DirectShow BaseClasses include files  (build)
 * DirectShow STRMBASE.lib  (build)
+
+Revisions
+---------
+2019.1.1
+    Update copyright year.
 
 Notes
 -----
