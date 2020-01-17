@@ -1,24 +1,22 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2019, Christoph Gohlke
-Copyright (c) 2006-2019, The Regents of the University of California
-Produced at the Laboratory for Fluorescence Dynamics
+Copyright (c) 2006-2020, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
-* Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
 
-* Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
 
-* Neither the name of the copyright holder nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -43,11 +41,13 @@ via the DirectShow IMediaDet interface.
 :Organization:
   Laboratory for Fluorescence Dynamics. University of California, Irvine
 
-:Version: 2019.1.1
+:License: BSD 3-Clause
+
+:Version: 2020.1.1
 
 Requirements
 ------------
-* `CPython 2.7 or 3.5+ <https://www.python.org>`_
+* `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.14 <https://www.numpy.org>`_
 * Microsoft Visual Studio  (build)
 * DirectX 9.0c SDK  (build)
@@ -56,8 +56,9 @@ Requirements
 
 Revisions
 ---------
-2019.1.1
-    Update copyright year.
+2020.1.1
+    Remove support for Python 2.7 and 3.5.
+    Update copyright.
 
 Notes
 -----
@@ -84,7 +85,7 @@ Example
 
 */
 
-#define _VERSION_ "2019.1.1"
+#define _VERSION_ "2020.1.1"
 
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_DCOM
@@ -527,8 +528,6 @@ const char module_doc[] =
 ">>> for frame in video:\n"
 "...     pass  # do_something_with(frame)\n";
 
-#if PY_MAJOR_VERSION >= 3
-
 struct module_state {
     PyObject *error;
 };
@@ -546,70 +545,49 @@ static int module_clear(PyObject *m) {
 }
 
 static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT,
-        "vidsrc",
-        NULL,
-        sizeof(struct module_state),
-        module_methods,
-        NULL,
-        module_traverse,
-        module_clear,
-        NULL
+    PyModuleDef_HEAD_INIT,
+    "vidsrc",
+    NULL,
+    sizeof(struct module_state),
+    module_methods,
+    NULL,
+    module_traverse,
+    module_clear,
+    NULL
 };
-
-#define INITERROR return NULL
 
 PyMODINIT_FUNC
 PyInit_vidsrc(void)
-
-#else
-
-#define INITERROR return
-
-PyMODINIT_FUNC
-initvidsrc(void)
-
-#endif
 {
     char *doc = (char *)PyMem_Malloc(sizeof(module_doc) + sizeof(_VERSION_));
     PyOS_snprintf(doc, sizeof(module_doc) + sizeof(_VERSION_),
                   module_doc, _VERSION_);
 
-#if PY_MAJOR_VERSION >= 3
     moduledef.m_doc = doc;
     PyObject *module = PyModule_Create(&moduledef);
-#else
-    PyObject *module = Py_InitModule3("vidsrc", module_methods, doc);
-#endif
 
     PyMem_Free(doc);
     if (module == NULL)
-        INITERROR;
+        return NULL;
 
     if (_import_array() < 0) {
         Py_DECREF(module);
-        INITERROR;
+        return NULL;
     }
 
     VidsrcType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&VidsrcType) < 0) {
         Py_DECREF(module);
-        INITERROR;
+        return NULL;
     }
 
     Py_INCREF(&VidsrcType);
     PyModule_AddObject(module, "VideoSource", (PyObject *)&VidsrcType);
 
-#if PY_MAJOR_VERSION < 3
-    PyObject* s = PyString_FromString(_VERSION_);
-#else
     PyObject* s = PyUnicode_FromString(_VERSION_);
-#endif
     PyObject* dict = PyModule_GetDict(module);
     PyDict_SetItemString(dict, "__version__", s);
     Py_DECREF(s);
 
-#if PY_MAJOR_VERSION >= 3
     return module;
-#endif
 }
