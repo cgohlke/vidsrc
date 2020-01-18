@@ -10,11 +10,13 @@ via the DirectShow IMediaDet interface.
 :Organization:
   Laboratory for Fluorescence Dynamics. University of California, Irvine
 
-:Version: 2019.1.1
+:License: BSD 3-Clause
+
+:Version: 2020.1.1
 
 Requirements
 ------------
-* `CPython 2.7 or 3.5+ <https://www.python.org>`_
+* `CPython >= 3.6 <https://www.python.org>`_
 * `Numpy 1.14 <https://www.numpy.org>`_
 * Microsoft Visual Studio  (build)
 * DirectX 9.0c SDK  (build)
@@ -23,8 +25,9 @@ Requirements
 
 Revisions
 ---------
-2019.1.1
-    Update copyright year.
+2020.1.1
+    Remove support for Python 2.7 and 3.5.
+    Update copyright.
 
 Notes
 -----
