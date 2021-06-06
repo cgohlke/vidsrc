@@ -1,7 +1,7 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2020, Christoph Gohlke
+Copyright (c) 2006-2021, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -43,12 +43,12 @@ via the DirectShow IMediaDet interface.
 
 :License: BSD 3-Clause
 
-:Version: 2020.1.1
+:Version: 2021.6.6
 
 Requirements
 ------------
-* `CPython >= 3.6 <https://www.python.org>`_
-* `Numpy 1.14 <https://www.numpy.org>`_
+* `CPython >= 3.7 <https://www.python.org>`_
+* `Numpy 1.15 <https://www.numpy.org>`_
 * Microsoft Visual Studio  (build)
 * DirectX 9.0c SDK  (build)
 * DirectShow BaseClasses include files  (build)
@@ -56,15 +56,23 @@ Requirements
 
 Revisions
 ---------
+2021.6.6
+    Remove support for Python 3.6 (NEP 29).
+    Fix compile error on PyPy3.
 2020.1.1
     Remove support for Python 2.7 and 3.5.
-    Update copyright.
 
 Notes
 -----
 The DirectShow IMediaDet interface is deprecated and may be removed from
 future releases of Windows
 (https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).
+
+To fix compile
+``error C2146: syntax error: missing ';' before identifier 'PVOID64'``,
+change ``typedef void * POINTER_64 PVOID64;``
+to ``typedef void * __ptr64 PVOID64;``
+in ``winnt.h``.
 
 Example
 -------
@@ -85,8 +93,9 @@ Example
 
 */
 
-#define _VERSION_ "2020.1.1"
+#define _VERSION_ "2021.6.6"
 
+#define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_DCOM
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -190,7 +199,7 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     HRESULT hr = CoCreateInstance(CLSID_MediaDet, NULL, CLSCTX_INPROC_SERVER,
         IID_IMediaDet, (void**)&self->imediadet);
     if (FAILED(hr)) {
-        PyErr_Format(PyExc_WindowsError, "failed CoCreateInstance IMediaDet");
+        PyErr_Format(PyExc_OSError, "failed CoCreateInstance IMediaDet");
         return -1;
     }
 
@@ -446,12 +455,7 @@ static PySequenceMethods vidsrc_as_sequence = {
 };
 
 static PyTypeObject VidsrcType = {
-#if PY_MAJOR_VERSION >= 3
     PyVarObject_HEAD_INIT(0,0)
-#else
-    PyObject_HEAD_INIT(0)
-    0,                         /* ob_size */
-#endif
     "vidsrc.VideoSource",      /* tp_name */
     sizeof(Vidsrc),            /* tp_basicsize */
     0,                         /* tp_itemsize */
@@ -459,11 +463,7 @@ static PyTypeObject VidsrcType = {
     0,                         /* tp_print */
     0,                         /* tp_getattr */
     0,                         /* tp_setattr */
-#if PY_MAJOR_VERSION >= 3
     NULL,                      /* tp_reserved */
-#else
-    0,                         /* tp_compare */
-#endif
     0,                         /* tp_repr */
     0,                         /* tp_as_number */
     &vidsrc_as_sequence,       /* tp_as_sequence */
