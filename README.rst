@@ -12,12 +12,12 @@ via the DirectShow IMediaDet interface.
 
 :License: BSD 3-Clause
 
-:Version: 2020.1.1
+:Version: 2021.6.6
 
 Requirements
 ------------
-* `CPython >= 3.6 <https://www.python.org>`_
-* `Numpy 1.14 <https://www.numpy.org>`_
+* `CPython >= 3.7 <https://www.python.org>`_
+* `Numpy 1.15 <https://www.numpy.org>`_
 * Microsoft Visual Studio  (build)
 * DirectX 9.0c SDK  (build)
 * DirectShow BaseClasses include files  (build)
@@ -25,15 +25,23 @@ Requirements
 
 Revisions
 ---------
+2021.6.6
+    Remove support for Python 3.6 (NEP 29).
+    Fix compile error on PyPy3.
 2020.1.1
     Remove support for Python 2.7 and 3.5.
-    Update copyright.
 
 Notes
 -----
 The DirectShow IMediaDet interface is deprecated and may be removed from
 future releases of Windows
 (https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).
+
+To fix compile
+``error C2146: syntax error: missing ';' before identifier 'PVOID64'``,
+change ``typedef void * POINTER_64 PVOID64;``
+to ``typedef void * __ptr64 PVOID64;``
+in ``winnt.h``.
 
 Example
 -------
