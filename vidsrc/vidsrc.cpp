@@ -1,7 +1,7 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2021, Christoph Gohlke
+Copyright (c) 2006-2022, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,70 +30,78 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-/* Video Frameserver for Numpy.
+#define _DOC_ \
+"Video Frameserver for Numpy.\n\
+\n\
+Vidsrc is a Python library to read frames from video files as numpy arrays\n\
+via the DirectShow IMediaDet interface.\n\
+\n\
+:Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
+:License: BSD 3-Clause\n\
+:Version: 2022.9.28\n\
+\n\
+Requirements\n\
+------------\n\
+\n\
+This release has been tested with the following requirements and \n\
+dependencies (other versions may work):\n\
+\n\
+- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_\n\
+- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_\n\
+- Microsoft Visual Studio 2019 (build)\n\
+- DirectX 9.0c SDK (build)\n\
+- DirectShow BaseClasses include files (build)\n\
+- DirectShow STRMBASE.lib (build)\n\
+\n\
+Revisions\n\
+---------\n\
+\n\
+2022.9.28\n\
+\n\
+- Update metadata.\n\
+\n\
+2021.6.6\n\
+\n\
+- Remove support for Python 3.6 (NEP 29).\n\
+- Fix compile error on PyPy3.\n\
+\n\
+2020.1.1\n\
+\n\
+- Remove support for Python 2.7 and 3.5.\n\
+\n\
+Notes\n\
+-----\n\
+\n\
+The DirectShow IMediaDet interface is deprecated and may be removed from\n\
+future releases of Windows\n\
+(https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).\n\
+\n\
+To fix compile\n\
+``error C2146: syntax error: missing ';' before identifier 'PVOID64'``,\n\
+change ``typedef void * POINTER_64 PVOID64;``\n\
+to ``typedef void * __ptr64 PVOID64;``\n\
+in ``winnt.h``.\n\
+\n\
+Example\n\
+-------\n\
+\n\
+>>> from vidsrc import VideoSource\n\
+>>> video = VideoSource('test.avi', grayscale=False)\n\
+>>> len(video)  # number of frames in video\n\
+48\n\
+>>> video.duration  # length in s\n\
+1.6016\n\
+>>> video.framerate  # frames per second\n\
+29.970089850329373\n\
+>>> video.shape  # frames, height, width, color channels\n\
+(48, 64, 64, 3)\n\
+>>> frame = video[0]  # access first frame\n\
+>>> frame = video[-1]  # access last frame\n\
+>>> for frame in video:\n\
+...     pass  # do_something_with(frame)\n\
+"
 
-Vidsrc is a Python library to read frames from video files as numpy arrays
-via the DirectShow IMediaDet interface.
-
-:Author:
-  `Christoph Gohlke <https://www.lfd.uci.edu/~gohlke/>`_
-
-:Organization:
-  Laboratory for Fluorescence Dynamics. University of California, Irvine
-
-:License: BSD 3-Clause
-
-:Version: 2021.6.6
-
-Requirements
-------------
-* `CPython >= 3.7 <https://www.python.org>`_
-* `Numpy 1.15 <https://www.numpy.org>`_
-* Microsoft Visual Studio  (build)
-* DirectX 9.0c SDK  (build)
-* DirectShow BaseClasses include files  (build)
-* DirectShow STRMBASE.lib  (build)
-
-Revisions
----------
-2021.6.6
-    Remove support for Python 3.6 (NEP 29).
-    Fix compile error on PyPy3.
-2020.1.1
-    Remove support for Python 2.7 and 3.5.
-
-Notes
------
-The DirectShow IMediaDet interface is deprecated and may be removed from
-future releases of Windows
-(https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).
-
-To fix compile
-``error C2146: syntax error: missing ';' before identifier 'PVOID64'``,
-change ``typedef void * POINTER_64 PVOID64;``
-to ``typedef void * __ptr64 PVOID64;``
-in ``winnt.h``.
-
-Example
--------
->>> from vidsrc import VideoSource
->>> video = VideoSource('test.avi', grayscale=False)
->>> len(video)  # number of frames in video
-48
->>> video.duration  # length in s
-1.6016
->>> video.framerate  # frames per second
-29.970089850329373
->>> video.shape  # frames, height, width, color channels
-(48, 64, 64, 3)
->>> frame = video[0]  # access first frame
->>> frame = video[-1]  # access last frame
->>> for frame in video:
-...     pass  # do_something_with(frame)
-
-*/
-
-#define _VERSION_ "2021.6.6"
+#define _VERSION_ "2022.9.28"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
@@ -504,30 +512,6 @@ static PyMethodDef module_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-const char module_doc[] =
-"Video Frameserver for Numpy.\n\n"
-"Read frames from video file as numpy array via DirectShow IMediaDet "
-"interface.\n\n"
-":Authors: `Christoph Gohlke <https://www.lfd.uci.edu/~gohlke/>`__\n\n"
-":Organization:\n"
-"  Laboratory for Fluorescence Dynamics. University of California, Irvine\n\n"
-":Version: %s\n\n"
-"Example:\n\n"
-">>> from vidsrc import VideoSource\n"
-">>> video = VideoSource('test.avi', grayscale=False)\n"
-">>> len(video)  # number of frames in video\n"
-"48\n"
-">>> video.duration  # length in s\n"
-"1.6016\n"
-">>> video.framerate  # frames per second\n"
-"29.970089850329373\n"
-">>> video.shape  # frames, height, width, color channels\n"
-"(48, 64, 64, 3)\n"
-">>> frame = video[0]  # access first frame\n"
-">>> frame = video[-1]  # access last frame\n"
-">>> for frame in video:\n"
-"...     pass  # do_something_with(frame)\n";
-
 struct module_state {
     PyObject *error;
 };
@@ -559,9 +543,8 @@ static struct PyModuleDef moduledef = {
 PyMODINIT_FUNC
 PyInit_vidsrc(void)
 {
-    char *doc = (char *)PyMem_Malloc(sizeof(module_doc) + sizeof(_VERSION_));
-    PyOS_snprintf(doc, sizeof(module_doc) + sizeof(_VERSION_),
-                  module_doc, _VERSION_);
+    char *doc = (char *)PyMem_Malloc(sizeof(_DOC_) + sizeof(_VERSION_));
+    PyOS_snprintf(doc, sizeof(_DOC_) + sizeof(_VERSION_), _DOC_, _VERSION_);
 
     moduledef.m_doc = doc;
     PyObject *module = PyModule_Create(&moduledef);
