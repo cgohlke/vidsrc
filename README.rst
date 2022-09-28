@@ -4,35 +4,42 @@ Video Frameserver for Numpy
 Vidsrc is a Python library to read frames from video files as numpy arrays
 via the DirectShow IMediaDet interface.
 
-:Author:
-  `Christoph Gohlke <https://www.lfd.uci.edu/~gohlke/>`_
-
-:Organization:
-  Laboratory for Fluorescence Dynamics. University of California, Irvine
-
+:Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-
-:Version: 2021.6.6
+:Version: 2022.9.28
 
 Requirements
 ------------
-* `CPython >= 3.7 <https://www.python.org>`_
-* `Numpy 1.15 <https://www.numpy.org>`_
-* Microsoft Visual Studio  (build)
-* DirectX 9.0c SDK  (build)
-* DirectShow BaseClasses include files  (build)
-* DirectShow STRMBASE.lib  (build)
+
+This release has been tested with the following requirements and 
+dependencies (other versions may work):
+
+- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
+- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
+- Microsoft Visual Studio 2019 (build)
+- DirectX 9.0c SDK (build)
+- DirectShow BaseClasses include files (build)
+- DirectShow STRMBASE.lib (build)
 
 Revisions
 ---------
+
+2022.9.28
+
+- Update metadata.
+
 2021.6.6
-    Remove support for Python 3.6 (NEP 29).
-    Fix compile error on PyPy3.
+
+- Remove support for Python 3.6 (NEP 29).
+- Fix compile error on PyPy3.
+
 2020.1.1
-    Remove support for Python 2.7 and 3.5.
+
+- Remove support for Python 2.7 and 3.5.
 
 Notes
 -----
+
 The DirectShow IMediaDet interface is deprecated and may be removed from
 future releases of Windows
 (https://docs.microsoft.com/en-us/windows/desktop/directshow/imediadet).
@@ -45,6 +52,7 @@ in ``winnt.h``.
 
 Example
 -------
+
 >>> from vidsrc import VideoSource
 >>> video = VideoSource('test.avi', grayscale=False)
 >>> len(video)  # number of frames in video
