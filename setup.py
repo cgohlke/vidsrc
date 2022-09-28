@@ -1,6 +1,6 @@
 # vidsrc/setup.py
 
-"""Vidsrc package setuptools script."""
+"""Vidsrc package Setuptools script."""
 
 import sys
 import re
@@ -9,16 +9,24 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 
 
+def search(pattern, code, flags=0):
+    # return first match for pattern in code
+    match = re.search(pattern, code, flags)
+    if match is None:
+        raise ValueError(f'{pattern!r} not found')
+    return match.groups()[0]
+
+
 with open('vidsrc/vidsrc.cpp') as fh:
     code = fh.read()
 
-version = re.search(r'#define _VERSION_ "(.*?)"', code).groups()[0]
+version = search(r'#define _VERSION_ "(.*?)"', code)
 
-readme = re.search(
-    r'\*/(?:\r\n|\r|\n){2}/\* (.*)\*/(?:\r\n|\r|\n){2}#',
+readme = search(
+    r'(?:\r\n|\r|\n)\"(.*)\"(?:\r\n|\r|\n){2}\#define _VERSION_',
     code,
     re.MULTILINE | re.DOTALL,
-).groups()[0]
+).replace('\\n\\', '')
 
 description = readme.splitlines()[0][:-1]
 
@@ -26,9 +34,11 @@ readme = '\n'.join(
     [description, '=' * len(description)] + readme.splitlines()[1:]
 )
 
-license = re.search(
-    r'(Copyright.*)\*/(?:\r\n|\r|\n){2}/\*', code, re.MULTILINE | re.DOTALL
-).groups()[0]
+license = search(
+    r'(Copyright.*)\*/(?:\r\n|\r|\n){2}\#define _DOC_',
+    code,
+    re.MULTILINE | re.DOTALL,
+)
 
 license = license.replace('# ', '').replace('#', '')
 
@@ -45,7 +55,10 @@ class build_ext(_build_ext):
 
     def finalize_options(self):
         _build_ext.finalize_options(self)
-        __builtins__.__NUMPY_SETUP__ = False
+        if isinstance(__builtins__, dict):
+            __builtins__['__NUMPY_SETUP__'] = False
+        else:
+            setattr(__builtins__, '__NUMPY_SETUP__', False)
         import numpy
 
         self.include_dirs.append(numpy.get_include())
@@ -57,11 +70,12 @@ STRMBASE_DIR = 'X:/DirectX/Samples/C++/DirectShow/BaseClasses'
 setup(
     name='vidsrc',
     version=version,
+    license='BSD',
     description=description,
     long_description=readme,
     author='Christoph Gohlke',
-    author_email='cgohlke@uci.edu',
-    url='https://www.lfd.uci.edu/~gohlke/',
+    author_email='cgohlke@cgohlke.com',
+    url='https://www.cgohlke.com',
     project_urls={
         'Bug Tracker': 'https://github.com/cgohlke/vidsrc/issues',
         'Source Code': 'https://github.com/cgohlke/vidsrc',
@@ -81,7 +95,6 @@ setup(
             libraries=['STRMBASE', 'Ole32', 'OleAut32', 'strmiids'],
         )
     ],
-    license='BSD',
     zip_safe=False,
     platforms=['Windows'],
     classifiers=[
@@ -97,5 +110,6 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 )
