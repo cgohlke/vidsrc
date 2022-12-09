@@ -4,6 +4,11 @@ include README.rst
 include tests/*.py
 include tests/test.avi
 
+exclude *.cmd
+recursive-exclude doc *
+recursive-exclude docs *
+recursive-exclude test *
+
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * *Copy*
