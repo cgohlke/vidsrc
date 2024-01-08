@@ -1,7 +1,7 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2022, Christoph Gohlke
+Copyright (c) 2006-2024, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,23 +38,41 @@ via the DirectShow IMediaDet interface.\n\
 \n\
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
 :License: BSD 3-Clause\n\
-:Version: 2022.9.28\n\
+:Version: 2024.1.6\n\
+\n\
+Quickstart\n\
+----------\n\
+\n\
+Install the vidsrc package and all dependencies from the\n\
+`Python Package Index <https://pypi.org/project/vidsrc/>`_::\n\
+\n\
+    python -m pip install -U vidsrc\n\
+\n\
+See `Examples`_ for using the programming interface.\n\
+\n\
+Source code and support are available on\n\
+`GitHub <https://github.com/cgohlke/vidsrc>`_.\n\
 \n\
 Requirements\n\
 ------------\n\
 \n\
-This release has been tested with the following requirements and \n\
+This revision was tested with the following requirements and \n\
 dependencies (other versions may work):\n\
 \n\
-- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_\n\
-- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_\n\
-- Microsoft Visual Studio 2019 (build)\n\
+- `CPython <https://www.python.org>`_  3.9.13, 3.10.11, 3.11.7, 3.12.1\n\
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.3\n\
+- Microsoft Visual Studio 2022 (build)\n\
 - DirectX 9.0c SDK (build)\n\
 - DirectShow BaseClasses include files (build)\n\
 - DirectShow STRMBASE.lib (build)\n\
 \n\
 Revisions\n\
 ---------\n\
+\n\
+2024.1.6\n\
+\n\
+- Support Python 3.12.\n\
+- Remove support for Python 3.8 and numpy 1.22 (NEP 29).\n\
 \n\
 2022.9.28\n\
 \n\
@@ -82,8 +100,8 @@ change ``typedef void * POINTER_64 PVOID64;``\n\
 to ``typedef void * __ptr64 PVOID64;``\n\
 in ``winnt.h``.\n\
 \n\
-Example\n\
--------\n\
+Examples\n\
+--------\n\
 \n\
 >>> from vidsrc import VideoSource\n\
 >>> video = VideoSource('test.avi', grayscale=False)\n\
@@ -101,7 +119,7 @@ Example\n\
 ...     pass  # do_something_with(frame)\n\
 "
 
-#define _VERSION_ "2022.9.28"
+#define _VERSION_ "2024.1.6"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
@@ -212,7 +230,7 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     }
 
     /* open video file */
-    CComBSTR bstr(PyUnicode_AsUnicode(self->filename));
+    CComBSTR bstr(PyUnicode_AsWideCharString(self->filename, NULL));
     Py_BEGIN_ALLOW_THREADS
         hr = self->imediadet->put_Filename(bstr);
     Py_END_ALLOW_THREADS
