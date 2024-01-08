@@ -6,23 +6,41 @@ via the DirectShow IMediaDet interface.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD 3-Clause
-:Version: 2022.9.28
+:Version: 2024.1.6
+
+Quickstart
+----------
+
+Install the vidsrc package and all dependencies from the
+`Python Package Index <https://pypi.org/project/vidsrc/>`_::
+
+    python -m pip install -U vidsrc
+
+See `Examples`_ for using the programming interface.
+
+Source code and support are available on
+`GitHub <https://github.com/cgohlke/vidsrc>`_.
 
 Requirements
 ------------
 
-This release has been tested with the following requirements and 
+This revision was tested with the following requirements and 
 dependencies (other versions may work):
 
-- `CPython 3.8.10, 3.9.13, 3.10.7, 3.11.0rc2 <https://www.python.org>`_
-- `Numpy 1.22.4 <https://pypi.org/project/numpy/>`_
-- Microsoft Visual Studio 2019 (build)
+- `CPython <https://www.python.org>`_  3.9.13, 3.10.11, 3.11.7, 3.12.1
+- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.3
+- Microsoft Visual Studio 2022 (build)
 - DirectX 9.0c SDK (build)
 - DirectShow BaseClasses include files (build)
 - DirectShow STRMBASE.lib (build)
 
 Revisions
 ---------
+
+2024.1.6
+
+- Support Python 3.12.
+- Remove support for Python 3.8 and numpy 1.22 (NEP 29).
 
 2022.9.28
 
@@ -50,8 +68,8 @@ change ``typedef void * POINTER_64 PVOID64;``
 to ``typedef void * __ptr64 PVOID64;``
 in ``winnt.h``.
 
-Example
--------
+Examples
+--------
 
 >>> from vidsrc import VideoSource
 >>> video = VideoSource('test.avi', grayscale=False)
