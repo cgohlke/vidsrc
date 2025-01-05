@@ -8,8 +8,7 @@ import vidsrc
 def test_module() -> None:
     """Test vidsrc module."""
 
-    assert 'version' in vidsrc.__doc__
-    assert vidsrc.__version__
+    assert vidsrc.__version__ in vidsrc.__doc__
 
 
 def test_videosource() -> None:
