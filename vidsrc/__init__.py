@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
 # vidsrc/__init__.py
 
-from .vidsrc import __doc__, __version__, VideoSource
+__all__ = ['__version__', 'VideoSource']
+
+from .vidsrc import VideoSource, __doc__, __version__
