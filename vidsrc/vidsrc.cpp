@@ -1,7 +1,7 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2024, Christoph Gohlke
+Copyright (c) 2006-2025, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@ via the DirectShow IMediaDet interface.\n\
 \n\
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
 :License: BSD 3-Clause\n\
-:Version: 2024.1.6\n\
+:Version: 2025.1.6\n\
 \n\
 Quickstart\n\
 ----------\n\
@@ -59,8 +59,8 @@ Requirements\n\
 This revision was tested with the following requirements and \n\
 dependencies (other versions may work):\n\
 \n\
-- `CPython <https://www.python.org>`_  3.9.13, 3.10.11, 3.11.7, 3.12.1\n\
-- `Numpy <https://pypi.org/project/numpy/>`_ 1.26.3\n\
+- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.8, 3.13.1 64-bit\n\
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.1\n\
 - Microsoft Visual Studio 2022 (build)\n\
 - DirectX 9.0c SDK (build)\n\
 - DirectShow BaseClasses include files (build)\n\
@@ -69,10 +69,15 @@ dependencies (other versions may work):\n\
 Revisions\n\
 ---------\n\
 \n\
+2025.1.6\n\
+\n\
+- Add type hints.\n\
+- Drop support for Python 3.9, support Python 3.13 and NumPy 2.\n\
+\n\
 2024.1.6\n\
 \n\
 - Support Python 3.12.\n\
-- Remove support for Python 3.8 and numpy 1.22 (NEP 29).\n\
+- Drop support for Python 3.8 and NumPy 1.22 (NEP 29).\n\
 \n\
 2022.9.28\n\
 \n\
@@ -80,12 +85,12 @@ Revisions\n\
 \n\
 2021.6.6\n\
 \n\
-- Remove support for Python 3.6 (NEP 29).\n\
+- Drop support for Python 3.6 (NEP 29).\n\
 - Fix compile error on PyPy3.\n\
 \n\
 2020.1.1\n\
 \n\
-- Remove support for Python 2.7 and 3.5.\n\
+- Drop support for Python 2.7 and 3.5.\n\
 \n\
 Notes\n\
 -----\n\
@@ -119,7 +124,7 @@ Examples\n\
 ...     pass  # do_something_with(frame)\n\
 "
 
-#define _VERSION_ "2024.1.6"
+#define _VERSION_ "2025.1.6"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
