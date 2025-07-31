@@ -37,8 +37,8 @@ Vidsrc is a Python library to read frames from video files as numpy arrays\n\
 via the DirectShow IMediaDet interface.\n\
 \n\
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
-:License: BSD 3-Clause\n\
-:Version: 2025.1.6\n\
+:License: BSD-3-Clause\n\
+:Version: 2025.8.1\n\
 \n\
 Quickstart\n\
 ----------\n\
@@ -59,8 +59,8 @@ Requirements\n\
 This revision was tested with the following requirements and \n\
 dependencies (other versions may work):\n\
 \n\
-- `CPython <https://www.python.org>`_ 3.10.11, 3.11.9, 3.12.8, 3.13.1 64-bit\n\
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.2.1\n\
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.5, 3.14.0rc 64-bit\n\
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.3.2\n\
 - Microsoft Visual Studio 2022 (build)\n\
 - DirectX 9.0c SDK (build)\n\
 - DirectShow BaseClasses include files (build)\n\
@@ -68,6 +68,10 @@ dependencies (other versions may work):\n\
 \n\
 Revisions\n\
 ---------\n\
+\n\
+2025.8.1\n\
+\n\
+- Drop support for Python 3.10, support Python 3.14.\n\
 \n\
 2025.1.6\n\
 \n\
@@ -124,7 +128,7 @@ Examples\n\
 ...     pass  # do_something_with(frame)\n\
 "
 
-#define _VERSION_ "2025.1.6"
+#define _VERSION_ "2025.8.1"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
@@ -575,6 +579,14 @@ PyInit_vidsrc(void)
     PyMem_Free(doc);
     if (module == NULL)
         return NULL;
+
+#ifdef Py_GIL_DISABLED
+    /* this module supports running with the GIL disabled */
+    if (PyUnstable_Module_SetGIL(module, Py_MOD_GIL_NOT_USED) < 0) {
+        Py_DECREF(module);
+        return NULL;
+    }
+#endif
 
     if (_import_array() < 0) {
         Py_DECREF(module);
