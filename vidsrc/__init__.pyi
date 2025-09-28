@@ -9,7 +9,6 @@ from numpy.typing import NDArray
 
 __version__: str
 
-
 class VideoSource(Sequence[NDArray[Any]]):
     """Access frames of video file as numpy arrays.
 
@@ -46,13 +45,10 @@ class VideoSource(Sequence[NDArray[Any]]):
         framerate: float = 0.0,
         grayscale: bool = False,
     ) -> None: ...
-
     @overload
     def __getitem__(self, key: int, /) -> NDArray[Any]: ...
-
     @overload
     def __getitem__(
         self, key: slice[Any, Any, Any], /
     ) -> Sequence[NDArray[Any]]: ...
-
     def __len__(self) -> int: ...
