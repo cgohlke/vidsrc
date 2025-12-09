@@ -8,7 +8,11 @@ include vidsrc/__init__.pyi
 include tests/*.py
 include tests/test.avi
 
+exclude .env
 exclude *.cmd
+exclude *.yaml
+exclude mypy.ini
+exclude ruff.toml
 recursive-exclude doc *
 recursive-exclude docs *
 recursive-exclude test *
