@@ -1,13 +1,14 @@
 # test_vidsrc.py
+"""Test the videosrc module."""
 
 import numpy
 import pytest
+
 import vidsrc
 
 
 def test_module() -> None:
     """Test vidsrc module."""
-
     assert vidsrc.__version__ in vidsrc.__doc__
 
 
