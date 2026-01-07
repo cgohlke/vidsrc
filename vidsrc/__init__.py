@@ -1,7 +1,10 @@
 # vidsrc/__init__.py
 
-__all__ = ['__version__', 'VideoSource']
+__all__ = ['VideoSource', '__version__']
 
 from .vidsrc import VideoSource, __doc__, __version__
 
-VideoSource.__module__ == 'vidsrc'
+# constants are repeated for documentation
+
+__version__ = __version__
+"""Vidsrc version string."""
