@@ -9,7 +9,7 @@ via the DirectShow IMediaDet interface.
 
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_
 :License: BSD-3-Clause
-:Version: 2025.8.1
+:Version: 2026.1.18
 
 Quickstart
 ----------
@@ -30,8 +30,8 @@ Requirements
 This revision was tested with the following requirements and 
 dependencies (other versions may work):
 
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.5, 3.14.0rc 64-bit
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.3.2
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.4.1
 - Microsoft Visual Studio 2022 (build)
 - DirectX 9.0c SDK (build)
 - DirectShow BaseClasses include files (build)
@@ -39,6 +39,10 @@ dependencies (other versions may work):
 
 Revisions
 ---------
+
+2026.1.18
+
+- Use multi-phase initialization.
 
 2025.8.1
 
