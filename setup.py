@@ -15,7 +15,8 @@ def search(pattern: str, string: str, flags: int = 0) -> str:
     """Return first match of pattern in string."""
     match = re.search(pattern, string, flags)
     if match is None:
-        raise ValueError(f'{pattern!r} not found')
+        msg = f'{pattern=!r} not found'
+        raise ValueError(msg)
     return match.groups()[0]
 
 
@@ -52,10 +53,11 @@ readme = search(
 description = readme.splitlines()[0][:-1]
 
 readme = '\n'.join(
-    [description, '=' * len(description)] + readme.splitlines()[1:]
+    [description, '=' * len(description), *readme.splitlines()[1:]]
 )
 
 if 'sdist' in sys.argv:
+    # update README, LICENSE, and CHANGES files
 
     with open('README.rst', 'w', encoding='utf-8') as fh:
         fh.write(fix_docstring_examples(readme))
@@ -70,6 +72,20 @@ if 'sdist' in sys.argv:
     with open('LICENSE', 'w', encoding='utf-8') as fh:
         fh.write('BSD-3-Clause license\n\n')
         fh.write(license)
+
+    # revisions = search(
+    #     r'(?:\r\n|\r|\n){2}(Revisions.*)- …',
+    #     readme,
+    #     re.MULTILINE | re.DOTALL,
+    # ).strip()
+
+    # with open('CHANGES.rst', encoding='utf-8') as fh:
+    #     old = fh.read()
+
+    # old = old.split(revisions.splitlines()[-1])[-1]
+    # with open('CHANGES.rst', 'w', encoding='utf-8') as fh:
+    #     fh.write(revisions.strip())
+    #     fh.write(old)
 
 DIRECTX_DIR = 'D:/Programs/DirectX9/include'
 STRMBASE_DIR = 'D:/Programs/DirectX9/Samples/C++/DirectShow/BaseClasses'
@@ -104,7 +120,7 @@ setup(
     zip_safe=False,
     platforms=['Windows'],
     classifiers=[
-        'Development Status :: 7 - Inactive',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
         'Intended Audience :: Developers',
         'Topic :: Multimedia :: Video',
