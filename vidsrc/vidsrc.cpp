@@ -1,7 +1,7 @@
 /* vidsrc.cpp */
 
 /*
-Copyright (c) 2006-2025, Christoph Gohlke
+Copyright (c) 2006-2026, Christoph Gohlke
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -38,7 +38,7 @@ via the DirectShow IMediaDet interface.\n\
 \n\
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
 :License: BSD-3-Clause\n\
-:Version: 2025.8.1\n\
+:Version: 2026.1.18\n\
 \n\
 Quickstart\n\
 ----------\n\
@@ -59,8 +59,8 @@ Requirements\n\
 This revision was tested with the following requirements and \n\
 dependencies (other versions may work):\n\
 \n\
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.5, 3.14.0rc 64-bit\n\
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.3.2\n\
+- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit\n\
+- `NumPy <https://pypi.org/project/numpy/>`_ 2.4.1\n\
 - Microsoft Visual Studio 2022 (build)\n\
 - DirectX 9.0c SDK (build)\n\
 - DirectShow BaseClasses include files (build)\n\
@@ -68,6 +68,10 @@ dependencies (other versions may work):\n\
 \n\
 Revisions\n\
 ---------\n\
+\n\
+2026.1.18\n\
+\n\
+- Use multi-phase initialization.\n\
 \n\
 2025.8.1\n\
 \n\
@@ -128,12 +132,12 @@ Examples\n\
 ...     pass  # do_something_with(frame)\n\
 "
 
-#define _VERSION_ "2025.8.1"
+#define _VERSION_ "2026.1.18"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_DCOM
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_2_0_API_VERSION
 
 #include "Python.h"
 
@@ -149,7 +153,10 @@ Examples\n\
 #include "float.h"
 #include "numpy/arrayobject.h"
 
-/* Vidsrc Object */
+/* thread-local storage for COM initialization */
+static Py_tss_t com_tss = Py_tss_NEEDS_INIT;
+
+/* Vidsrc object */
 
 typedef struct {
     PyObject_VAR_HEAD
@@ -171,7 +178,7 @@ static void
 vidsrc_dealloc(Vidsrc* self)
 {
     if (self->dims)
-        delete self->dims;
+        delete[] self->dims;
 
     if (self->imediadet) {
         self->imediadet->Release();
@@ -181,8 +188,6 @@ vidsrc_dealloc(Vidsrc* self)
     Py_XDECREF(self->shape);
     Py_XDECREF(self->filename);
     Py_TYPE(self)->tp_free((PyObject*)self);
-
-    CoUninitialize();
 }
 
 static PyObject *
@@ -196,6 +201,9 @@ vidsrc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             Py_DECREF(self);
             return NULL;
         }
+        self->dims = NULL;
+        self->imediadet = NULL;
+        self->shape = NULL;
     }
     return (PyObject *)self;
 }
@@ -228,8 +236,21 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
         Py_XDECREF(tmp);
     }
 
-    /* init COM and connect to IMediaDet */
-    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    /* initialize COM for this thread */
+    if (PyThread_tss_get(&com_tss) == NULL) {
+        HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+        if (FAILED(hr)) {
+            PyErr_Format(
+                PyExc_RuntimeError, "failed to initialize COM: 0x%lx", hr
+        );
+            return -1;
+        }
+        if (PyThread_tss_set(&com_tss, (void*)1) != 0) {
+            CoUninitialize();
+            PyErr_NoMemory();
+            return -1;
+        }
+    }
 
     HRESULT hr = CoCreateInstance(CLSID_MediaDet, NULL, CLSCTX_INPROC_SERVER,
         IID_IMediaDet, (void**)&self->imediadet);
@@ -239,14 +260,21 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     }
 
     /* open video file */
-    CComBSTR bstr(PyUnicode_AsWideCharString(self->filename, NULL));
+    wchar_t *wstr = PyUnicode_AsWideCharString(self->filename, NULL);
+    if (wstr == NULL) {
+        PyErr_Format(PyExc_ValueError, "invalid filename");
+        return -1;
+    }
+    CComBSTR bstr(wstr);
     Py_BEGIN_ALLOW_THREADS
         hr = self->imediadet->put_Filename(bstr);
     Py_END_ALLOW_THREADS
-        if (FAILED(hr)) {
-            PyErr_Format(PyExc_IOError, "failed IMediaDet::put_Filename");
-            return -1;
-        }
+    if (FAILED(hr)) {
+        PyErr_Format(PyExc_IOError, "failed IMediaDet::put_Filename");
+        PyMem_Free(wstr);
+        return -1;
+    }
+    PyMem_Free(wstr);
 
     /* find video stream */
     long mstreams;
@@ -351,6 +379,8 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     /* sanity check */
     if (self->stride*self->height != self->framesize-sizeof(BITMAPINFOHEADER))
     {
+        delete[] self->dims;
+        self->dims = NULL;
         PyErr_Format(PyExc_ValueError,
             "frame size (%i) does not match array stride (%i))",
             self->framesize-sizeof(BITMAPINFOHEADER), self->stride);
@@ -409,6 +439,7 @@ vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
             ret = (PyArrayObject*)PyArray_New(&PyArray_Type, 2,
                 self->dims, NPY_DOUBLE, NULL, NULL, 0, NULL, NULL);
             if (ret == NULL) {
+                if (buffer) delete buffer;
                 PyErr_Format(PyExc_ValueError, "failed to create Numpy array");
                 return NULL;
             }
@@ -432,6 +463,7 @@ vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
             ret = (PyArrayObject*)PyArray_New(&PyArray_Type, 3,
                 self->dims, NPY_UINT8, NULL, NULL, 0, NULL, NULL);
             if (ret == NULL) {
+                if (buffer) delete buffer;
                 PyErr_Format(PyExc_ValueError, "failed to create Numpy array");
                 return NULL;
             }
@@ -552,16 +584,59 @@ static int module_traverse(PyObject *m, visitproc visit, void *arg) {
 
 static int module_clear(PyObject *m) {
     Py_CLEAR(GETSTATE(m)->error);
+
+    if (PyThread_tss_is_created(&com_tss)) {
+        if (PyThread_tss_get(&com_tss) != NULL) {
+            CoUninitialize();
+        }
+        PyThread_tss_delete(&com_tss);
+    }
+
     return 0;
 }
+
+static int module_exec(PyObject *module) {
+    if (_import_array() < 0) {
+        return -1;
+    }
+
+    /* create thread-local storage slot for COM initialization */
+    if (PyThread_tss_create(&com_tss) != 0) {
+        PyErr_NoMemory();
+        return -1;
+    }
+
+    VidsrcType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&VidsrcType) < 0) {
+        return -1;
+    }
+
+    Py_INCREF(&VidsrcType);
+    PyModule_AddObject(module, "VideoSource", (PyObject *)&VidsrcType);
+
+    PyObject *s = PyUnicode_FromString(_VERSION_);
+    if (!s) return -1;
+    PyObject *dict = PyModule_GetDict(module);
+    if (PyDict_SetItemString(dict, "__version__", s) < 0) {
+        Py_DECREF(s);
+        return -1;
+    }
+    Py_DECREF(s);
+    return 0;
+}
+
+static struct PyModuleDef_Slot module_slots[] = {
+    {Py_mod_exec, module_exec},
+    {0, NULL}
+};
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "vidsrc",
-    NULL,
+    _DOC_,
     sizeof(struct module_state),
     module_methods,
-    NULL,
+    module_slots,
     module_traverse,
     module_clear,
     NULL
@@ -570,42 +645,5 @@ static struct PyModuleDef moduledef = {
 PyMODINIT_FUNC
 PyInit_vidsrc(void)
 {
-    char *doc = (char *)PyMem_Malloc(sizeof(_DOC_) + sizeof(_VERSION_));
-    PyOS_snprintf(doc, sizeof(_DOC_) + sizeof(_VERSION_), _DOC_, _VERSION_);
-
-    moduledef.m_doc = doc;
-    PyObject *module = PyModule_Create(&moduledef);
-
-    PyMem_Free(doc);
-    if (module == NULL)
-        return NULL;
-
-#ifdef Py_GIL_DISABLED
-    /* this module supports running with the GIL disabled */
-    if (PyUnstable_Module_SetGIL(module, Py_MOD_GIL_NOT_USED) < 0) {
-        Py_DECREF(module);
-        return NULL;
-    }
-#endif
-
-    if (_import_array() < 0) {
-        Py_DECREF(module);
-        return NULL;
-    }
-
-    VidsrcType.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&VidsrcType) < 0) {
-        Py_DECREF(module);
-        return NULL;
-    }
-
-    Py_INCREF(&VidsrcType);
-    PyModule_AddObject(module, "VideoSource", (PyObject *)&VidsrcType);
-
-    PyObject* s = PyUnicode_FromString(_VERSION_);
-    PyObject* dict = PyModule_GetDict(module);
-    PyDict_SetItemString(dict, "__version__", s);
-    Py_DECREF(s);
-
-    return module;
+    return PyModuleDef_Init(&moduledef);
 }
