@@ -2,13 +2,25 @@
 
 """Vidsrc package Setuptools script."""
 
+import os
 import re
 import sys
+import sysconfig
 
 import numpy
 from setuptools import Extension, setup
 
-buildnumber = ''
+LIMITED_API = os.environ.get('CG_LIMITED_API', '1').lower() in {'1', 'true'}
+GIL_DISABLED = bool(sysconfig.get_config_var('Py_GIL_DISABLED'))
+
+if LIMITED_API and not GIL_DISABLED:
+    py_limited_api = True
+    define_macros = [('Py_LIMITED_API', 0x030C0000)]
+    setup_options = {'bdist_wheel': {'py_limited_api': 'cp312'}}
+else:
+    py_limited_api = False
+    define_macros = []
+    setup_options = {}
 
 
 def search(pattern: str, string: str, flags: int = 0) -> str:
@@ -42,7 +54,6 @@ with open('vidsrc/vidsrc.cpp', encoding='utf-8') as fh:
     code = fh.read()
 
 version = search(r'#define _VERSION_ "(.*?)"', code).replace('.x.x', '.dev0')
-version += ('.' + buildnumber) if buildnumber else ''
 
 readme = search(
     r'(?:\r\n|\r|\n)\"(.*)\"(?:\r\n|\r|\n){2}\#define _VERSION_',
@@ -103,10 +114,10 @@ setup(
     project_urls={
         'Bug Tracker': 'https://github.com/cgohlke/vidsrc/issues',
         'Source Code': 'https://github.com/cgohlke/vidsrc',
-        # 'Documentation': 'https://',
+        # 'Documentation': 'https://www.cgohlke.com/docs/vidsrc/',
     },
-    python_requires='>=3.11',
-    install_requires=['numpy'],
+    python_requires='>=3.12',
+    install_requires=['numpy>=2.1'],
     packages=['vidsrc'],
     ext_modules=[
         Extension(
@@ -115,9 +126,11 @@ setup(
             include_dirs=[DIRECTX_DIR, STRMBASE_DIR, numpy.get_include()],
             library_dirs=[STRMBASE_DIR + '/libraries'],
             libraries=['STRMBASE', 'Ole32', 'OleAut32', 'strmiids'],
+            define_macros=define_macros,
+            py_limited_api=py_limited_api,
         )
     ],
-    zip_safe=False,
+    options=setup_options,
     platforms=['Windows'],
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -127,9 +140,9 @@ setup(
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: C++',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
         'Programming Language :: Python :: 3.14',
+        'Programming Language :: Python :: 3.15',
     ],
 )
