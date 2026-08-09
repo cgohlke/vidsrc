@@ -38,7 +38,7 @@ via the DirectShow IMediaDet interface.\n\
 \n\
 :Author: `Christoph Gohlke <https://www.cgohlke.com>`_\n\
 :License: BSD-3-Clause\n\
-:Version: 2026.1.18\n\
+:Version: 2026.8.8\n\
 \n\
 Quickstart\n\
 ----------\n\
@@ -59,15 +59,21 @@ Requirements\n\
 This revision was tested with the following requirements and \n\
 dependencies (other versions may work):\n\
 \n\
-- `CPython <https://www.python.org>`_ 3.11.9, 3.12.10, 3.13.11, 3.14.2 64-bit\n\
-- `NumPy <https://pypi.org/project/numpy/>`_ 2.4.1\n\
-- Microsoft Visual Studio 2022 (build)\n\
+- `CPython <https://www.python.org>`_ 3.12.10, 3.13.15, 3.14.7, 3.15.0rc\n\
+- `Numpy <https://pypi.org/project/numpy/>`_ 2.5.2\n\
+- Microsoft Visual Studio 2026 (build)\n\
 - DirectX 9.0c SDK (build)\n\
 - DirectShow BaseClasses include files (build)\n\
 - DirectShow STRMBASE.lib (build)\n\
 \n\
 Revisions\n\
 ---------\n\
+\n\
+2026.8.8\n\
+\n\
+- Make C++ extension ABI3 and free-threading compatible.\n\
+- Drop support for Python 3.11 and numpy 2.0 (SPEC0).\n\
+- Support Python 3.15.\n\
 \n\
 2026.1.18\n\
 \n\
@@ -132,12 +138,12 @@ Examples\n\
 ...     pass  # do_something_with(frame)\n\
 "
 
-#define _VERSION_ "2026.1.18"
+#define _VERSION_ "2026.8.8"
 
 #define PY_SSIZE_T_CLEAN
 #define WIN32_LEAN_AND_MEAN
 #define _WIN32_DCOM
-#define NPY_NO_DEPRECATED_API NPY_2_0_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_2_1_API_VERSION
 
 #include "Python.h"
 
@@ -147,38 +153,38 @@ Examples\n\
 #include <tchar.h>
 #include <Qedit.h>
 #include <mtype.h>
+#include <new>
 
-#include "structmember.h"
 #include "math.h"
 #include "float.h"
 #include "numpy/arrayobject.h"
 
 /* thread-local storage for COM initialization */
-static Py_tss_t com_tss = Py_tss_NEEDS_INIT;
+static Py_tss_t *com_tss = NULL;
 
 /* Vidsrc object */
 
 typedef struct {
-    PyObject_VAR_HEAD
-    PyObject *shape;       /* shape of video data */
-    PyObject *filename;    /* name of video file */
-    Py_ssize_t *dims;      /* numpy array dimensions */
-    long stride;           /* numpy array stride along width */
-    long width;            /* frame width */
-    long height;           /* frame height */
-    long framesize;        /* frame size */
-    double framerate;      /* frames per second */
-    double duration;       /* duration in seconds */
-    Py_ssize_t frames;     /* number of frames */
-    int grayscale;         /* convert to gray scale */
-    IMediaDet *imediadet;  /* COM object */
+    PyObject_HEAD PyObject *shape; /* shape of video data */
+    PyObject *filename;            /* name of video file */
+    Py_ssize_t *dims;              /* numpy array dimensions */
+    long stride;                   /* numpy array stride along width */
+    long width;                    /* frame width */
+    long height;                   /* frame height */
+    long framesize;                /* frame size */
+    double framerate;              /* frames per second */
+    double duration;               /* duration in seconds */
+    Py_ssize_t frames;             /* number of frames */
+    int grayscale;                 /* convert to gray scale */
+    IMediaDet *imediadet;          /* COM object */
 } Vidsrc;
 
 static void
-vidsrc_dealloc(Vidsrc* self)
+vidsrc_dealloc(
+    Vidsrc *self)
 {
     if (self->dims)
-        delete[] self->dims;
+        PyMem_Free(self->dims);
 
     if (self->imediadet) {
         self->imediadet->Release();
@@ -187,13 +193,19 @@ vidsrc_dealloc(Vidsrc* self)
 
     Py_XDECREF(self->shape);
     Py_XDECREF(self->filename);
-    Py_TYPE(self)->tp_free((PyObject*)self);
+    PyTypeObject *tp = Py_TYPE((PyObject *)self);
+    freefunc tp_free = (freefunc)PyType_GetSlot(tp, Py_tp_free);
+    tp_free(self);
+    Py_DECREF(tp);
 }
 
 static PyObject *
-vidsrc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+vidsrc_new(
+    PyTypeObject *type,
+    PyObject *args,
+    PyObject *kwds)
 {
-    Vidsrc *self = (Vidsrc *)type->tp_alloc(type, 0);
+    Vidsrc *self = (Vidsrc *)PyType_GenericAlloc(type, 0);
 
     if (self != NULL) {
         self->filename = PyUnicode_FromString("");
@@ -209,8 +221,22 @@ vidsrc_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
-vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
+vidsrc_init(
+    Vidsrc *self,
+    PyObject *args,
+    PyObject *kwds)
 {
+    /* clean up previous state in case __init__ is called again */
+    if (self->imediadet) {
+        self->imediadet->Release();
+        self->imediadet = NULL;
+    }
+    if (self->dims) {
+        PyMem_Free(self->dims);
+        self->dims = NULL;
+    }
+    Py_CLEAR(self->shape);
+
     self->framerate = 0.0;
     self->duration = 0.0;
     self->frames = 0;
@@ -223,10 +249,20 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     /* parse Python arguments */
     PyObject *tmp;
     PyObject *path = NULL;
-    static char *kwlist[] = {"path", "framerate", "grayscale", NULL};
+    static const char *kwlist[] = {
+        "filename", "framerate", "grayscale", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|di", kwlist,
-        &path, &self->framerate, &self->grayscale)) {
+    if (
+        !PyArg_ParseTupleAndKeywords(
+        args,
+        kwds,
+        "O|di",
+        const_cast<char **>(kwlist),
+        &path,
+        &self->framerate,
+        &self->grayscale
+    ))
+    {
         return -1;
     }
 
@@ -234,26 +270,36 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
         tmp = self->filename;
         self->filename = PyUnicode_FromObject(path);
         Py_XDECREF(tmp);
+        if (self->filename == NULL) {
+            return -1;
+        }
     }
 
     /* initialize COM for this thread */
-    if (PyThread_tss_get(&com_tss) == NULL) {
+    if (PyThread_tss_get(com_tss) == NULL) {
         HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
         if (FAILED(hr)) {
             PyErr_Format(
-                PyExc_RuntimeError, "failed to initialize COM: 0x%lx", hr
-        );
+                PyExc_RuntimeError,
+                "failed to initialize COM: 0x%lx",
+                hr
+            );
             return -1;
         }
-        if (PyThread_tss_set(&com_tss, (void*)1) != 0) {
+        if (PyThread_tss_set(com_tss, (void *)1) != 0) {
             CoUninitialize();
             PyErr_NoMemory();
             return -1;
         }
     }
 
-    HRESULT hr = CoCreateInstance(CLSID_MediaDet, NULL, CLSCTX_INPROC_SERVER,
-        IID_IMediaDet, (void**)&self->imediadet);
+    HRESULT hr = CoCreateInstance(
+        CLSID_MediaDet,
+        NULL,
+        CLSCTX_INPROC_SERVER,
+        IID_IMediaDet,
+        (void **)&self->imediadet
+    );
     if (FAILED(hr)) {
         PyErr_Format(PyExc_OSError, "failed CoCreateInstance IMediaDet");
         return -1;
@@ -262,15 +308,13 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     /* open video file */
     wchar_t *wstr = PyUnicode_AsWideCharString(self->filename, NULL);
     if (wstr == NULL) {
-        PyErr_Format(PyExc_ValueError, "invalid filename");
         return -1;
     }
     CComBSTR bstr(wstr);
     Py_BEGIN_ALLOW_THREADS
         hr = self->imediadet->put_Filename(bstr);
-    Py_END_ALLOW_THREADS
-    if (FAILED(hr)) {
-        PyErr_Format(PyExc_IOError, "failed IMediaDet::put_Filename");
+    Py_END_ALLOW_THREADS if (FAILED(hr)) {
+        PyErr_Format(PyExc_OSError, "failed IMediaDet::put_Filename");
         PyMem_Free(wstr);
         return -1;
     }
@@ -281,7 +325,7 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     bool found = false;
     hr = self->imediadet->get_OutputStreams(&mstreams);
     if (FAILED(hr)) {
-        PyErr_Format(PyExc_TypeError, "invalid media type (no streams)");
+        PyErr_Format(PyExc_ValueError, "invalid media type (no streams)");
         return -1;
     }
 
@@ -300,7 +344,7 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
         }
     }
     if (!found) {
-        PyErr_Format(PyExc_TypeError, "invalid media type (no video stream)");
+        PyErr_Format(PyExc_ValueError, "invalid media type (no video stream)");
         return -1;
     }
 
@@ -308,28 +352,38 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
     AM_MEDIA_TYPE mtype;
     hr = self->imediadet->get_StreamMediaType(&mtype);
     if (SUCCEEDED(hr)) {
-        if ((mtype.formattype == FORMAT_VideoInfo) &&
-            (mtype.cbFormat >= sizeof(VIDEOINFOHEADER))) {
-                VIDEOINFOHEADER *vh = (VIDEOINFOHEADER*)(mtype.pbFormat);
-                self->width = vh->bmiHeader.biWidth;
-                self->height = vh->bmiHeader.biHeight;
-                if (self->height < 0) {
-                    self->height *= -1;
-                }
-        } else {
+        if (
+            (mtype.formattype == FORMAT_VideoInfo) &&
+            (mtype.cbFormat >= sizeof(VIDEOINFOHEADER)))
+        {
+            VIDEOINFOHEADER *vh = (VIDEOINFOHEADER *)(mtype.pbFormat);
+            self->width = vh->bmiHeader.biWidth;
+            self->height = vh->bmiHeader.biHeight;
+            if (self->height < 0) {
+                self->height *= -1;
+            }
+        }
+        else {
             hr = VFW_E_INVALIDMEDIATYPE;
         }
         FreeMediaType(mtype);
     }
     if (FAILED(hr)) {
-        PyErr_Format(PyExc_TypeError, "invalid media type");
+        PyErr_Format(PyExc_ValueError, "invalid media type");
         return -1;
     }
 
-    self->imediadet->get_StreamLength(&self->duration);
+    hr = self->imediadet->get_StreamLength(&self->duration);
+    if (FAILED(hr)) {
+        PyErr_Format(PyExc_OSError, "failed to get stream length");
+        return -1;
+    }
 
-    if ((self->framerate <= 0.0) || (1.0/self->framerate > self->duration)) {
-        self->imediadet->get_FrameRate(&self->framerate);
+    if ((self->framerate <= 0.0) || (1.0 / self->framerate > self->duration)) {
+        hr = self->imediadet->get_FrameRate(&self->framerate);
+        if (FAILED(hr)) {
+            self->framerate = 0.0;
+        }
     }
     if (self->framerate <= 0.0) {
         self->framerate = 29.97;
@@ -346,44 +400,70 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
         PyErr_Format(PyExc_MemoryError, "failed to create shape tuple");
         return -1;
     }
-    PyTuple_SET_ITEM(self->shape, 0, PyLong_FromSsize_t(self->frames));
-    PyTuple_SET_ITEM(self->shape, 1, PyLong_FromLong(self->height));
-    PyTuple_SET_ITEM(self->shape, 2, PyLong_FromLong(self->width));
+    PyObject *item;
+    item = PyLong_FromSsize_t(self->frames);
+    if (item == NULL)
+        return -1;
+    PyTuple_SetItem(self->shape, 0, item);
+    item = PyLong_FromLong(self->height);
+    if (item == NULL)
+        return -1;
+    PyTuple_SetItem(self->shape, 1, item);
+    item = PyLong_FromLong(self->width);
+    if (item == NULL)
+        return -1;
+    PyTuple_SetItem(self->shape, 2, item);
     if (!self->grayscale) {
-        PyTuple_SET_ITEM(self->shape, 3, PyLong_FromLong(3));
+        item = PyLong_FromLong(3);
+        if (item == NULL)
+            return -1;
+        PyTuple_SetItem(self->shape, 3, item);
     }
 
     /* read first frame to determine frame data size */
     Py_BEGIN_ALLOW_THREADS
-        hr = self->imediadet->GetBitmapBits(0, &self->framesize, NULL,
-                                            self->width, self->height);
+        hr = self->imediadet->GetBitmapBits(
+        0,
+        &self->framesize,
+        NULL,
+        self->width,
+        self->height
+        );
     Py_END_ALLOW_THREADS
 
     if (FAILED(hr)) {
-        PyErr_Format(PyExc_IOError, "failed to read first frame");
+        PyErr_Format(PyExc_OSError, "failed to read first frame");
         return -1;
     }
 
     /* Windows bitmap scan lines are aligned */
     self->stride = 4;
-    self->stride = ((((self->width*3) + self->stride-1) / self->stride) *
-                                                                self->stride);
+    self->stride = ((((self->width * 3) + self->stride - 1) / self->stride) *
+        self->stride);
 
     /* dimensions of numpy array */
-    self->dims = new Py_ssize_t[4];
+    self->dims = PyMem_New(Py_ssize_t, 4);
+    if (self->dims == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
     self->dims[0] = self->height;
     self->dims[1] = self->width;
     self->dims[2] = 3;
     self->dims[3] = (self->width == self->stride) ? self->stride
                                                   : self->stride + 1;
     /* sanity check */
-    if (self->stride*self->height != self->framesize-sizeof(BITMAPINFOHEADER))
+    if (self->stride * self->height !=
+        self->framesize - sizeof(BITMAPINFOHEADER))
     {
-        delete[] self->dims;
+        PyMem_Free(self->dims);
         self->dims = NULL;
-        PyErr_Format(PyExc_ValueError,
-            "frame size (%i) does not match array stride (%i))",
-            self->framesize-sizeof(BITMAPINFOHEADER), self->stride);
+        PyErr_Format(
+            PyExc_ValueError,
+            "frame size (%ld) does not match array stride (%ld)",
+            self->framesize - (long)sizeof(BITMAPINFOHEADER),
+            self->stride
+        );
         return -1;
     }
 
@@ -391,30 +471,35 @@ vidsrc_init(Vidsrc *self, PyObject *args, PyObject *kwds)
 }
 
 static Py_ssize_t
-vidsrc_length(Vidsrc *self)
+vidsrc_length(
+    Vidsrc *self)
 {
     return self->frames;
 }
 
 static PyObject *
-vidsrc_iter(Vidsrc *self)
+vidsrc_iter(
+    Vidsrc *self)
 {
     return PySeqIter_New((PyObject *)self);
 }
 
 static PyObject *
-vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
+vidsrc_getframe(
+    Vidsrc *self,
+    Py_ssize_t frame)
 {
     HRESULT hr;
 
     if (frame < 0) {
         frame = self->frames + frame;
-    } else if ((frame < 0) || (frame >= self->frames)) {
-        PyErr_Format(PyExc_IndexError, "frame out of bounds: %i", frame);
+    }
+    if ((frame < 0) || (frame >= self->frames)) {
+        PyErr_Format(PyExc_IndexError, "frame out of bounds: %zd", frame);
         return NULL;
     }
 
-    unsigned char* buffer = new unsigned char[self->framesize];
+    unsigned char *buffer = new (std::nothrow) unsigned char[self->framesize];
     if (buffer == NULL) {
         PyErr_Format(PyExc_MemoryError, "out of memory");
         return NULL;
@@ -422,8 +507,13 @@ vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
 
     /* release the GIL and get frame */
     Py_BEGIN_ALLOW_THREADS
-    hr = self->imediadet->GetBitmapBits((double)frame/self->framerate,
-                            NULL, (char *)buffer, self->width, self->height);
+        hr = self->imediadet->GetBitmapBits(
+        (double)frame / self->framerate,
+        NULL,
+        (char *)buffer,
+        self->width,
+        self->height
+        );
     Py_END_ALLOW_THREADS
 
     if (SUCCEEDED(hr)) {
@@ -436,43 +526,59 @@ vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
 
         if (self->grayscale) {
             /* convert BGR color channels (bytes) to gray scale (double) */
-            ret = (PyArrayObject*)PyArray_New(&PyArray_Type, 2,
-                self->dims, NPY_DOUBLE, NULL, NULL, 0, NULL, NULL);
+            ret = (PyArrayObject *)PyArray_New(
+                &PyArray_Type,
+                2,
+                self->dims,
+                NPY_DOUBLE,
+                NULL,
+                NULL,
+                0,
+                NULL,
+                NULL
+            );
             if (ret == NULL) {
-                if (buffer) delete buffer;
-                PyErr_Format(PyExc_ValueError, "failed to create Numpy array");
+                delete[] buffer;
                 return NULL;
             }
             double *pdst = (double *)PyArray_DATA(ret);
             j = self->height;
             /* release the GIL and process the frame */
-            Py_BEGIN_ALLOW_THREADS
-            while (j--) {
-                psrc = pbuf + j*self->stride;
+            Py_BEGIN_ALLOW_THREADS while (j--) {
+                psrc = pbuf + j * self->stride;
                 i = self->width;
                 while (i--) {
-                    *pdst++ = (0.11 * double(*(psrc)) +
-                               0.59 * double(*(psrc+1)) +
-                               0.30 * double(*(psrc+2))) / 255.0;
+                    *pdst++ = (0.114 * double(*(psrc)) +
+                        0.587 * double(*(psrc + 1)) +
+                        0.299 * double(*(psrc + 2))) /
+                        255.0;
                     psrc += 3;
                 }
             }
             Py_END_ALLOW_THREADS
-        } else {
+        }
+        else {
             /* convert BGR to RGB color channels (bytes) */
-            ret = (PyArrayObject*)PyArray_New(&PyArray_Type, 3,
-                self->dims, NPY_UINT8, NULL, NULL, 0, NULL, NULL);
+            ret = (PyArrayObject *)PyArray_New(
+                &PyArray_Type,
+                3,
+                self->dims,
+                NPY_UINT8,
+                NULL,
+                NULL,
+                0,
+                NULL,
+                NULL
+            );
             if (ret == NULL) {
-                if (buffer) delete buffer;
-                PyErr_Format(PyExc_ValueError, "failed to create Numpy array");
+                delete[] buffer;
                 return NULL;
             }
             unsigned char *pdst = (unsigned char *)PyArray_DATA(ret);
             j = self->height;
             /* release the GIL and copy the frame */
-            Py_BEGIN_ALLOW_THREADS
-            while (j--) {
-                psrc = pbuf + j*self->stride + 2;
+            Py_BEGIN_ALLOW_THREADS while (j--) {
+                psrc = pbuf + j * self->stride + 2;
                 i = self->width;
                 while (i--) {
                     *pdst++ = *psrc--; /* Red */
@@ -483,158 +589,136 @@ vidsrc_getframe(Vidsrc* self, Py_ssize_t frame)
             }
             Py_END_ALLOW_THREADS
         }
-        if (buffer) delete buffer;
+        delete[] buffer;
         return PyArray_Return(ret);
-    } else {
-        if (buffer) delete buffer;
-        PyErr_Format(PyExc_IOError, "failed to read frame %i", frame);
+    }
+    else {
+        delete[] buffer;
+        PyErr_Format(PyExc_OSError, "failed to read frame %zd", frame);
         return NULL;
     }
-    return NULL;
 }
 
-static PyMethodDef* vidsrc_methods = NULL;
+static PyMethodDef *vidsrc_methods = NULL;
 
 static PyMemberDef vidsrc_members[] = {
-    {"filename", T_OBJECT_EX, offsetof(Vidsrc, filename), 0,
-        "File name"},
-    {"framerate", T_DOUBLE, offsetof(Vidsrc, framerate), 0,
-        "Video frame rate in fps"},
-    {"duration", T_DOUBLE, offsetof(Vidsrc, duration), 0,
-        "Video duration in s"},
-    {"shape", T_OBJECT_EX, offsetof(Vidsrc, shape), 0,
-        "Shape of video data "
-        "(number of frames, frame height, frame width, color channels)"},
-    {NULL}  /* Sentinel */
+    { "filename", Py_T_OBJECT_EX, offsetof(Vidsrc, filename), Py_READONLY,
+      "File name" },
+    { "framerate", Py_T_DOUBLE, offsetof(Vidsrc, framerate), Py_READONLY,
+      "Video frame rate in fps" },
+    { "duration", Py_T_DOUBLE, offsetof(Vidsrc, duration), Py_READONLY,
+      "Video duration in s" },
+    { "shape", Py_T_OBJECT_EX, offsetof(Vidsrc, shape), Py_READONLY,
+      "Shape of video data "
+      "(number of frames, frame height, frame width, color channels)" },
+    { NULL } /* Sentinel */
 };
 
-static PySequenceMethods vidsrc_as_sequence = {
-    (lenfunc)vidsrc_length,     /* sq_length */
-    (binaryfunc)NULL,           /* sq_concat is handled by nb_add */
-    (ssizeargfunc)NULL,
-    (ssizeargfunc)vidsrc_getframe,
-    (ssizessizeargfunc)NULL,    /* vidsrc_slice */
-    (ssizeobjargproc)NULL,      /* sq_ass_item */
-    (ssizessizeobjargproc)NULL, /* sq_ass_slice */
-    (objobjproc)NULL,           /* sq_contains */
-    (binaryfunc)NULL,           /* sg_inplace_concat */
-    (ssizeargfunc)NULL,
-};
+static PyType_Slot vidsrc_slots[] = {
+    { Py_tp_dealloc, (void *)vidsrc_dealloc },
+    { Py_tp_iter, (void *)vidsrc_iter },
+    { Py_tp_methods, vidsrc_methods },
+    { Py_tp_members, vidsrc_members },
+    { Py_tp_init, (void *)vidsrc_init },
+    { Py_tp_new, (void *)vidsrc_new },
+    { Py_tp_doc, (void *)
+      "Access the frames of a video file as numpy arrays.\n\n"
+      "Instances must be used in a single thread only.\n\n" },
+    { Py_sq_length, (void *)vidsrc_length },
+    { Py_sq_item, (void *)vidsrc_getframe },
+    { 0, NULL } };
 
-static PyTypeObject VidsrcType = {
-    PyVarObject_HEAD_INIT(0,0)
-    "vidsrc.VideoSource",      /* tp_name */
-    sizeof(Vidsrc),            /* tp_basicsize */
-    0,                         /* tp_itemsize */
-    (destructor)vidsrc_dealloc,/* tp_dealloc */
-    0,                         /* tp_print */
-    0,                         /* tp_getattr */
-    0,                         /* tp_setattr */
-    NULL,                      /* tp_reserved */
-    0,                         /* tp_repr */
-    0,                         /* tp_as_number */
-    &vidsrc_as_sequence,       /* tp_as_sequence */
-    0,                         /* tp_as_mapping */
-    0,                         /* tp_hash */
-    0,                         /* tp_call */
-    0,                         /* tp_str */
-    0,                         /* tp_getattro */
-    0,                         /* tp_setattro */
-    0,                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    /* tp_flags */
-    "Access the frames of a video file as numpy arrays.\n\n"
-    "Instances must be used in a single thread only.\n\n",
-    /* tp_doc */
-    0,                         /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    (getiterfunc)vidsrc_iter,  /* tp_iter */
-    0,                         /* tp_iternext */
-    vidsrc_methods,            /* tp_methods */
-    vidsrc_members,            /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)vidsrc_init,     /* tp_init */
-    0,                         /* tp_alloc */
-    vidsrc_new,                /* tp_new */
+static PyType_Spec vidsrc_spec = {
+    "vidsrc.VideoSource",
+    sizeof(Vidsrc),
+    0,
+    Py_TPFLAGS_DEFAULT,
+    vidsrc_slots,
 };
 
 /* Vidsrc Module */
 
 static PyMethodDef module_methods[] = {
-    {NULL}  /* Sentinel */
+    { NULL } /* Sentinel */
 };
 
-struct module_state {
-    PyObject *error;
-};
-
-#define GETSTATE(m) ((struct module_state*)PyModule_GetState(m))
-
-static int module_traverse(PyObject *m, visitproc visit, void *arg) {
-    Py_VISIT(GETSTATE(m)->error);
+static int module_traverse(
+    PyObject *m,
+    visitproc visit,
+    void *arg)
+{
+    (void)m;
+    (void)visit;
+    (void)arg;
     return 0;
 }
 
-static int module_clear(PyObject *m) {
-    Py_CLEAR(GETSTATE(m)->error);
-
-    if (PyThread_tss_is_created(&com_tss)) {
-        if (PyThread_tss_get(&com_tss) != NULL) {
+static int module_clear(
+    PyObject *m)
+{
+    if (com_tss != NULL && PyThread_tss_is_created(com_tss)) {
+        if (PyThread_tss_get(com_tss) != NULL) {
             CoUninitialize();
         }
-        PyThread_tss_delete(&com_tss);
+        PyThread_tss_delete(com_tss);
+        PyThread_tss_free(com_tss);
+        com_tss = NULL;
     }
 
     return 0;
 }
 
-static int module_exec(PyObject *module) {
+static int module_exec(
+    PyObject *module)
+{
     if (_import_array() < 0) {
         return -1;
     }
 
     /* create thread-local storage slot for COM initialization */
-    if (PyThread_tss_create(&com_tss) != 0) {
+    com_tss = PyThread_tss_alloc();
+    if (com_tss == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    if (PyThread_tss_create(com_tss) != 0) {
+        PyThread_tss_free(com_tss);
+        com_tss = NULL;
         PyErr_NoMemory();
         return -1;
     }
 
-    VidsrcType.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&VidsrcType) < 0) {
+    PyObject *type = PyType_FromSpec(&vidsrc_spec);
+    if (type == NULL) {
         return -1;
     }
 
-    Py_INCREF(&VidsrcType);
-    PyModule_AddObject(module, "VideoSource", (PyObject *)&VidsrcType);
-
-    PyObject *s = PyUnicode_FromString(_VERSION_);
-    if (!s) return -1;
-    PyObject *dict = PyModule_GetDict(module);
-    if (PyDict_SetItemString(dict, "__version__", s) < 0) {
-        Py_DECREF(s);
+    if (PyModule_AddObjectRef(module, "VideoSource", type) < 0) {
+        Py_DECREF(type);
         return -1;
     }
-    Py_DECREF(s);
+    Py_DECREF(type);
+
+    if (PyModule_AddStringConstant(module, "__version__", _VERSION_) < 0) {
+        return -1;
+    }
     return 0;
 }
 
 static struct PyModuleDef_Slot module_slots[] = {
-    {Py_mod_exec, module_exec},
-    {0, NULL}
+    { Py_mod_exec, module_exec },
+    { Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED },
+#ifdef Py_MOD_GIL_NOT_USED
+    { Py_mod_gil, Py_MOD_GIL_NOT_USED },
+#endif
+    { 0, NULL }
 };
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "vidsrc",
     _DOC_,
-    sizeof(struct module_state),
+    0,
     module_methods,
     module_slots,
     module_traverse,
